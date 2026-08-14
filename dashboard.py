@@ -1,0 +1,600 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+import os
+
+# ============================================================
+# CONFIGURACION
+# ============================================================
+st.set_page_config(page_title="IX Escuela de Jovenes Ruralistas", page_icon="🌱", layout="wide", initial_sidebar_state="expanded")
+
+st.markdown("""
+<style>
+    .main { background-color: #f5f6fa; }
+    .stMetric {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 15px 20px; border-radius: 12px; color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+    .stMetric label { color: rgba(255,255,255,0.85) !important; font-size: 0.85rem !important; }
+    .stMetric [data-testid="stMetricValue"] { color: white !important; font-size: 1.8rem !important; font-weight: 700 !important; }
+    .block-container { padding-top: 1rem; }
+    h1 { color: #1a237e; border-bottom: 3px solid #4CAF50; padding-bottom: 10px; }
+    h2 { color: #283593; }
+    .stTabs [data-baseweb="tab"] { background-color: #e8eaf6; border-radius: 8px 8px 0 0; padding: 10px 20px; font-weight: 600; }
+    .stTabs [aria-selected="true"] { background-color: #4CAF50 !important; color: white !important; }
+    div[data-testid="stSidebar"] { background: linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%); }
+    div[data-testid="stSidebar"] .stRadio label, div[data-testid="stSidebar"] .stSelectbox label,
+    div[data-testid="stSidebar"] .stMultiSelect label, div[data-testid="stSidebar"] .stSlider label { color: rgba(255,255,255,0.9) !important; }
+    div[data-testid="stSidebar"] h1 { color: white !important; border-bottom: 2px solid rgba(255,255,255,0.3); }
+    div[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.2); }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# COLORES Y PLANTILLA
+# ============================================================
+PALETTE = ['#2196F3', '#E91E63', '#FF9800', '#4CAF50', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B', '#795548', '#F44336']
+
+def template(fig, height=420):
+    fig.update_layout(
+        template='plotly_white',
+        font=dict(family='Segoe UI, sans-serif', size=12, color='#333'),
+        title=dict(font=dict(size=16, color='#1a237e'), x=0.5, xanchor='center'),
+        margin=dict(t=50, b=40, l=40, r=20),
+        height=height,
+        legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5, font_size=11),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='#eee')
+    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='#eee')
+    return fig
+
+def bar_text(fig, fmt='%.0f'):
+    fig.update_traces(textposition='outside', textfont_size=11, textfont_color='#333')
+    return fig
+
+# ============================================================
+# CARGAR DATOS
+# ============================================================
+@st.cache_data
+def cargar_datos():
+    path = os.path.join(os.path.dirname(__file__), 'Sistematizacion_nueva.xlsx')
+    d = {}
+    d['becarios'] = pd.read_excel(path, sheet_name='01a.Becarios')
+    d['mentores'] = pd.read_excel(path, sheet_name='01b.Mentores')
+    d['representantes'] = pd.read_excel(path, sheet_name='01c.Representantes')
+    d['equipos'] = pd.read_excel(path, sheet_name='02.Equipos')
+    d['modulos'] = pd.read_excel(path, sheet_name='03.Modulos')
+    d['sesiones'] = pd.read_excel(path, sheet_name='04.Sesiones')
+    d['asistencia'] = pd.read_excel(path, sheet_name='05.Asistencia')
+    d['encuestas'] = pd.read_excel(path, sheet_name='06.Encuestas')
+    d['linea_final'] = pd.read_excel(path, sheet_name='08.LineaFinal')
+    d['examen'] = pd.read_excel(path, sheet_name='09.Examen')
+    d['entregables'] = pd.read_excel(path, sheet_name='10.Entregables')
+    d['planes'] = pd.read_excel(path, sheet_name='11.PlanesEmprendimiento')
+    d['eval_mentores'] = pd.read_excel(path, sheet_name='12.EvalMentores')
+    d['bitacora'] = pd.read_excel(path, sheet_name='13.BitacoraTrabajo')
+    d['asistencia']['Fecha_str'] = pd.to_datetime(d['asistencia']['Fecha']).dt.strftime('%Y-%m-%d')
+    d['enc_f'] = d['encuestas'][d['encuestas']['Sesion'] > 1].copy()
+    d['enc_f']['Calif_num'] = pd.to_numeric(d['enc_f']['Calificacion'], errors='coerce')
+    return d
+
+datos = cargar_datos()
+
+sesion_nombres = {2: 'Realidad DAR', 3: 'Agroecologia', 4: 'Genero e Interculturalidad',
+                  5: 'CANVAS T1', 6: 'CANVAS T2', 7: 'CANVAS T3', 8: 'CANVAS T4', 9: 'Simulacro'}
+
+def filtrar(val):
+    if pd.isna(val): return False
+    return str(val).strip() not in ['Sin respuesta', 'Sin respuesta / Satisfecho']
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.markdown("# 🌱 IX Escuela")
+    st.markdown("### Jovenes Ruralistas")
+    st.markdown("---")
+    pagina = st.radio("Navegacion", ["🏠 Resumen General", "👥 Becarios", "📋 Encuestas", "📅 Asistencia", "📝 Evaluaciones", "📈 Linea Base vs Final"], label_visibility="collapsed")
+    st.markdown("---")
+    regiones = ['Todas'] + sorted(datos['becarios']['Region'].dropna().unique().tolist())
+    region_filtro = st.selectbox("Region", regiones)
+    generos = ['Todos'] + sorted(datos['becarios']['Genero'].dropna().unique().tolist())
+    genero_filtro = st.selectbox("Genero", generos)
+    st.markdown("---")
+    st.caption("IX Escuela de Jovenes Ruralistas 2026 | Ypard / EJR")
+
+df_b = datos['becarios'].copy()
+if region_filtro != 'Todas': df_b = df_b[df_b['Region'] == region_filtro]
+if genero_filtro != 'Todos': df_b = df_b[df_b['Genero'] == genero_filtro]
+
+# ============================================================
+# RESUMEN GENERAL
+# ============================================================
+if pagina == "🏠 Resumen General":
+    st.title("Resumen General - IX Escuela de Jovenes Ruralistas")
+    st.markdown("**Programa de fortalecimiento de liderazgo juvenil rural** | Mayo - Julio 2026")
+    st.markdown("---")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Becarios", len(datos['becarios']))
+    with c2: st.metric("Mentores", len(datos['mentores']))
+    with c3: st.metric("Sesiones", 10)
+    with c4: st.metric("Encuestas", len(datos['enc_f']))
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Representantes", len(datos['representantes']))
+    with c2: st.metric("Equipos", 10)
+    with c3: st.metric("Registros Asistencia", f"{len(datos['asistencia']):,}")
+    with c4: st.metric("Participantes Unicos", datos['asistencia']['Nombre'].nunique())
+
+    st.markdown("---")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        gen = datos['becarios']['Genero'].value_counts()
+        fig = go.Figure(data=[go.Pie(labels=gen.index, values=gen.values, hole=0.45,
+                                     marker_colors=[PALETTE[1], PALETTE[0]],
+                                     textinfo='percent+label', textfont_size=13,
+                                     pull=[0.03, 0])])
+        fig = template(fig, 380)
+        fig.update_layout(title='Distribucion por Genero')
+        st.plotly_chart(fig, use_container_width=True)
+
+    with c2:
+        pais = datos['becarios']['Pais'].value_counts().reset_index()
+        pais.columns = ['Pais', 'Cantidad']
+        fig = px.bar(pais, x='Pais', y='Cantidad', text='Cantidad', color='Cantidad',
+                     color_continuous_scale=['#90CAF9', '#1565C0'])
+        fig = template(fig, 380)
+        fig.update_layout(title='Becarios por Pais', showlegend=False, coloraxis_showscale=False)
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        asist = datos['asistencia'].groupby('Fecha_str')['Nombre'].nunique().reset_index()
+        asist.columns = ['Fecha', 'Participantes']
+        fig = px.bar(asist, x='Fecha', y='Participantes', text='Participantes',
+                     color_discrete_sequence=[PALETTE[3]])
+        fig = template(fig, 380)
+        fig.update_layout(title='Participantes por Sesion')
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with c2:
+        cal = datos['enc_f'].groupby('Sesion')['Calif_num'].mean().reset_index()
+        cal.columns = ['Sesion', 'Calificacion']
+        cal['Label'] = cal['Sesion'].map(lambda x: f"S{x}")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=cal['Label'], y=cal['Calificacion'], mode='lines+markers+text',
+                                  line=dict(color=PALETTE[0], width=3), marker=dict(size=10),
+                                  text=[f'{v:.2f}' for v in cal['Calificacion']],
+                                  textposition='top center', textfont=dict(size=11, color='#333')))
+        fig = template(fig, 380)
+        fig.update_layout(title='Calificacion Promedio por Sesion', yaxis_range=[3.5, 5.5])
+        st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# BECARIOS
+# ============================================================
+elif pagina == "👥 Becarios":
+    st.title("Analisis de Becarios")
+    st.markdown(f"**Region:** {region_filtro} | **Genero:** {genero_filtro} | **Becarios:** {len(df_b)}")
+    st.markdown("---")
+
+    tab1, tab2, tab3, tab4 = st.tabs(["Demografia", "Conocimientos", "Emprendimiento", "Preguntas Abiertas"])
+
+    with tab1:
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Total", len(df_b))
+        with c2: st.metric("Edad Promedio", f"{df_b['Edad'].mean():.1f}")
+        with c3: st.metric("Con Vinculo Rural", f"{(df_b['Vinculo_Rural']=='Si').sum()}")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            gen = df_b['Genero'].value_counts()
+            fig = go.Figure(data=[go.Pie(labels=gen.index, values=gen.values, hole=0.45,
+                                         marker_colors=[PALETTE[1], PALETTE[0]],
+                                         textinfo='percent+label+value', textfont_size=12, pull=[0.03, 0])])
+            fig = template(fig, 380)
+            fig.update_layout(title='Distribucion por Genero')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            fig = px.histogram(df_b, x='Edad', nbins=12, text_auto=True, color_discrete_sequence=[PALETTE[0]])
+            fig.add_vline(x=df_b['Edad'].mean(), line_dash="dash", line_color="red",
+                         annotation_text=f"Promedio: {df_b['Edad'].mean():.1f}", annotation_position="top right")
+            fig = template(fig, 380)
+            fig.update_layout(title='Distribucion por Edad', bargap=0.05)
+            st.plotly_chart(fig, use_container_width=True)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            edu = df_b['Nivel educativo'].value_counts().reset_index()
+            edu.columns = ['Nivel', 'Cantidad']
+            fig = px.bar(edu, x='Nivel', y='Cantidad', text='Cantidad', color_discrete_sequence=[PALETTE[3]])
+            fig = template(fig, 350)
+            fig.update_layout(title='Nivel Educativo')
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            leng = df_b['Lengua materna'].value_counts().reset_index()
+            leng.columns = ['Lengua', 'Cantidad']
+            fig = px.bar(leng, x='Lengua', y='Cantidad', text='Cantidad', color_discrete_sequence=[PALETTE[4]])
+            fig = template(fig, 350)
+            fig.update_layout(title='Lengua Materna')
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            vr = df_b['Vinculo_Rural'].value_counts()
+            fig = go.Figure(data=[go.Pie(labels=vr.index, values=vr.values, hole=0.45,
+                                         marker_colors=[PALETTE[3], PALETTE[1]],
+                                         textinfo='percent+label', textfont_size=12)])
+            fig = template(fig, 350)
+            fig.update_layout(title='Vinculo con el Ambito Rural')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            ti = df_b['Tiempo_Vinculo_Rural'].value_counts().reset_index()
+            ti.columns = ['Tiempo', 'Cantidad']
+            fig = px.bar(ti, x='Tiempo', y='Cantidad', text='Cantidad', color_discrete_sequence=[PALETTE[5]])
+            fig = template(fig, 350)
+            fig.update_layout(title='Tiempo de Vinculo Rural')
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        cc = [c for c in df_b.columns if c.startswith('Conoc_')]
+        cn = [c.replace('Conoc_', '') for c in cc]
+        cm = [df_b[c].mean() for c in cc]
+
+        fig = go.Figure(data=[go.Bar(x=cn, y=cm, marker_color=PALETTE[:len(cn)],
+                                      text=[f'{v:.2f}' for v in cm], textposition='outside',
+                                      hovertemplate='%{x}<br>Promedio: %{y:.2f}/3<extra></extra>')])
+        fig = template(fig, 450)
+        fig.update_layout(title='Nivel de Conocimiento Promedio (0=Nada, 3=Avanzado)', yaxis_range=[0, 3.5])
+        fig.add_hline(y=2, line_dash="dash", line_color="#aaa", annotation_text="Nivel Intermedio")
+        fig.update_xaxes(tickangle=-25)
+        st.plotly_chart(fig, use_container_width=True)
+
+        if len(df_b['Region'].unique()) > 1:
+            top_r = df_b['Region'].value_counts().head(6).index
+            df_top = df_b[df_b['Region'].isin(top_r)]
+            hm = df_top.groupby('Region')[cc].mean()
+            hm.columns = cn
+            fig = px.imshow(hm, text_auto='.1f', color_continuous_scale='RdYlGn', aspect='auto')
+            fig = template(fig, 400)
+            fig.update_layout(title='Conocimientos por Region (Top 6)')
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab3:
+        emp_cols = ['Ha_Emprendido_Rural', 'Tiene_Emprendimiento', 'Ha_Hecho_Canvas',
+                    'Ha_Capacitacion', 'Ha_Accedido_Fondos', 'Ha_Liderado']
+        emp_names = ['Ha emprendido', 'Tiene emprendimiento', 'Ha hecho CANVAS',
+                     'Ha recibido capacitacion', 'Ha accedido fondos', 'Ha liderado']
+
+        fig = make_subplots(rows=2, cols=3, specs=[[{'type': 'pie'}]*3]*2, subplot_titles=emp_names,
+                           horizontal_spacing=0.08, vertical_spacing=0.15)
+        for i, (col, name) in enumerate(zip(emp_cols, emp_names)):
+            r, c = i//3+1, i%3+1
+            counts = df_b[col].value_counts()
+            fig.add_trace(go.Pie(labels=counts.index, values=counts.values, hole=0.4,
+                                 marker_colors=[PALETTE[3], PALETTE[1]],
+                                 textinfo='percent', textfont_size=10), row=r, col=c)
+        fig = template(fig, 500)
+        fig.update_layout(title='Experiencia y Emprendimiento', showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+        for col, nombre in [('Comodidad_Publico', 'Comodidad hablando en publico'),
+                             ('Capacidad_Liderazgo', 'Capacidad de liderazgo'),
+                             ('Comodidad_Equipo', 'Comodidad trabajando en equipo')]:
+            counts = df_b[col].value_counts().reset_index()
+            counts.columns = ['Respuesta', 'Cantidad']
+            fig = px.bar(counts, x='Cantidad', y='Respuesta', orientation='h', text='Cantidad',
+                         color_discrete_sequence=[PALETTE[0]])
+            fig = template(fig, 250)
+            fig.update_layout(title=nombre, margin=dict(t=40, b=10))
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab4:
+        for col, nombre, color in [('Cat_QueEsperaAprender', 'Que Espera Aprender', PALETTE[0]),
+                                     ('Cat_TemasInteres', 'Temas de Interes', PALETTE[1]),
+                                     ('Cat_QueEsperaLograr', 'Que Espera Lograr', PALETTE[2])]:
+            cats = df_b[col].value_counts().reset_index()
+            cats.columns = ['Categoria', 'Cantidad']
+            cats['%'] = (cats['Cantidad']/len(df_b)*100).round(1)
+            fig = px.bar(cats, x='Cantidad', y='Categoria', orientation='h', text='Cantidad',
+                         color_discrete_sequence=[color])
+            fig = template(fig, max(280, len(cats)*38))
+            fig.update_layout(title=f'{nombre} ({len(df_b)} respuestas)', margin=dict(t=50))
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# ENCUESTAS
+# ============================================================
+elif pagina == "📋 Encuestas":
+    st.title("Encuestas de Satisfaccion por Sesion")
+    st.markdown("Resultados de las encuestas (sin sesion 1 - bienvenida)")
+    st.markdown("---")
+
+    ses_f = st.multiselect("Sesiones", sorted(datos['enc_f']['Sesion'].unique()),
+                            default=sorted(datos['enc_f']['Sesion'].unique()),
+                            format_func=lambda x: f"S{x}: {sesion_nombres.get(x, '')}")
+    df_enc = datos['enc_f'][datos['enc_f']['Sesion'].isin(ses_f)]
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Encuestas", len(df_enc))
+    with c2:
+        cal = df_enc['Calif_num'].mean()
+        st.metric("Calificacion Promedio", f"{cal:.2f}/5" if pd.notna(cal) else "N/A")
+    with c3: st.metric("Sesiones", len(ses_f))
+    with c4: st.metric("Respuestas Abiertas", int(df_enc['Cat_Ideas'].apply(filtrar).sum()))
+
+    st.markdown("---")
+
+    tab1, tab2, tab3 = st.tabs(["Calificacion", "Categorias Abiertas", "Detalle por Sesion"])
+
+    with tab1:
+        cal_s = df_enc.groupby('Sesion')['Calif_num'].mean().reset_index()
+        cal_s.columns = ['Sesion', 'Cal']
+        cal_s['Label'] = cal_s['Sesion'].map(lambda x: f"S{x}: {sesion_nombres.get(x, '')[:15]}")
+        fig = px.bar(cal_s, x='Label', y='Cal', text='Cal', color='Cal',
+                     color_continuous_scale='RdYlGn', range_color=[3.5, 5])
+        fig = template(fig, 420)
+        fig.update_layout(title='Calificacion Promedio por Sesion', yaxis_range=[3, 5.5],
+                         coloraxis_showscale=False)
+        fig.update_traces(texttemplate='%{text:.2f}', textposition='outside', textfont_size=12)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        for col, nombre, color in [('Cat_Ideas', 'Ideas Aprendidas', PALETTE[0]),
+                                     ('Cat_Gusto', 'Lo que Mas Gusto', PALETTE[1]),
+                                     ('Cat_Mejora', 'Aspectos a Mejorar', PALETTE[2]),
+                                     ('Cat_Profundizar', 'Temas a Profundizar', PALETTE[3])]:
+            df_v = df_enc[df_enc[col].apply(filtrar)]
+            cats = df_v[col].value_counts().reset_index()
+            cats.columns = ['Categoria', 'Cantidad']
+            cats['%'] = (cats['Cantidad']/len(df_v)*100).round(1)
+            fig = px.bar(cats, x='Cantidad', y='Categoria', orientation='h', text='Cantidad',
+                         color_discrete_sequence=[color])
+            fig = template(fig, max(280, len(cats)*38))
+            fig.update_layout(title=f'{nombre} ({len(df_v)} respuestas validas)', margin=dict(t=50))
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab3:
+        for ses in ses_f:
+            with st.expander(f"S{ses}: {sesion_nombres.get(ses, '')}", expanded=False):
+                sub = df_enc[df_enc['Sesion'] == ses]
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("Encuestas", len(sub))
+                with c2:
+                    c = sub['Calif_num'].mean()
+                    st.metric("Calificacion", f"{c:.2f}/5" if pd.notna(c) else "N/A")
+                with c3: st.metric("Respuestas Abiertas", int(sub['Cat_Ideas'].apply(filtrar).sum()))
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("**Ideas aprendidas:**")
+                    for cat, val in sub[sub['Cat_Ideas'].apply(filtrar)]['Cat_Ideas'].value_counts().items():
+                        st.markdown(f"- {cat}: **{val}**")
+                with c2:
+                    st.markdown("**Lo que mas gusto:**")
+                    for cat, val in sub[sub['Cat_Gusto'].apply(filtrar)]['Cat_Gusto'].value_counts().items():
+                        st.markdown(f"- {cat}: **{val}**")
+
+# ============================================================
+# ASISTENCIA
+# ============================================================
+elif pagina == "📅 Asistencia":
+    st.title("Analisis de Asistencia")
+    st.markdown("---")
+
+    df_a = datos['asistencia'].copy()
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Total Registros", f"{len(df_a):,}")
+    with c2: st.metric("Participantes Unicos", df_a['Nombre'].nunique())
+    with c3: st.metric("Sesiones", df_a['Fecha_str'].nunique())
+    with c4: st.metric("Promedio/Sesion", f"{len(df_a)//df_a['Fecha_str'].nunique():,}")
+
+    st.markdown("---")
+
+    tab1, tab2 = st.tabs(["Por Sesion", "Por Participante"])
+
+    with tab1:
+        af = df_a.groupby('Fecha_str')['Nombre'].nunique().reset_index()
+        af.columns = ['Fecha', 'Participantes']
+        fig = px.bar(af, x='Fecha', y='Participantes', text='Participantes',
+                     color_discrete_sequence=[PALETTE[3]])
+        fig = template(fig, 420)
+        fig.update_layout(title='Participantes Unicos por Sesion')
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+        at = df_a.groupby('Fecha_str').size().reset_index()
+        at.columns = ['Fecha', 'Registros']
+        fig = px.bar(at, x='Fecha', y='Registros', text='Registros',
+                     color_discrete_sequence=[PALETTE[0]])
+        fig = template(fig, 420)
+        fig.update_layout(title='Total Registros por Sesion')
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        n = st.slider("Mostrar Top", 10, 50, 20)
+        top = df_a['Nombre'].value_counts().head(n).reset_index()
+        top.columns = ['Nombre', 'Registros']
+        fig = px.bar(top, x='Registros', y='Nombre', orientation='h', text='Registros',
+                     color_discrete_sequence=[PALETTE[4]])
+        fig = template(fig, max(400, n*25))
+        fig.update_layout(title=f'Top {n} Participantes con Mas Asistencia')
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# EVALUACIONES
+# ============================================================
+elif pagina == "📝 Evaluaciones":
+    st.title("Evaluaciones")
+    st.markdown("---")
+
+    tab1, tab2, tab3 = st.tabs(["Examen Inicial", "Entregables", "Planes de Emprendimiento"])
+
+    with tab1:
+        de = datos['examen'].copy()
+        de['Puntaje'] = pd.to_numeric(de['Puntuacion'], errors='coerce')
+        aprob = (de['Puntaje'] >= 18).sum()
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("Examenes", len(de))
+        with c2: st.metric("Promedio", f"{de['Puntaje'].mean():.1f}/20")
+        with c3: st.metric("Aprobados", f"{aprob}/{len(de)}")
+        with c4: st.metric("% Aprobados", f"{aprob/len(de)*100:.0f}%")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            fig = px.histogram(de, x='Puntaje', nbins=10, text_auto=True, color_discrete_sequence=[PALETTE[0]])
+            fig.add_vline(x=18, line_dash="dash", line_color="#4CAF50",
+                         annotation_text="Aprobado: 18", annotation_position="top right")
+            fig = template(fig, 380)
+            fig.update_layout(title='Distribucion de Puntajes', bargap=0.05)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            ds = de.dropna(subset=['Puntaje']).sort_values('Puntaje', ascending=True)
+            fig = px.bar(ds, x='Puntaje', y='Nombre', orientation='h', text='Puntaje',
+                         color_discrete_sequence=[PALETTE[0]])
+            fig.add_vline(x=18, line_dash="dash", line_color="#4CAF50")
+            fig = template(fig, 380)
+            fig.update_layout(title='Puntajes por Participante')
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        ent = datos['entregables'].copy()
+        ent_cols = ['Entregable_1', 'Entregable_2', 'Entregable_3', 'Entregable_4', 'Entregable_5']
+        ec = [ent[c].notna().sum() for c in ent_cols]
+        fig = go.Figure(data=[go.Bar(x=ent_cols, y=ec, marker_color=PALETTE[:5],
+                                      text=ec, textposition='outside')])
+        fig = template(fig, 380)
+        fig.update_layout(title='Notas por Entregable')
+        st.plotly_chart(fig, use_container_width=True)
+
+        ent['Prom'] = pd.to_numeric(ent['Promedio'], errors='coerce')
+        pv = ent['Prom'].dropna()
+        if len(pv) > 0:
+            c1, c2 = st.columns(2)
+            with c1: st.metric("Con Promedio", len(pv))
+            with c2: st.metric("Promedio General", f"{pv.mean():.1f}")
+            fig = px.histogram(ent, x='Prom', nbins=10, text_auto=True, color_discrete_sequence=[PALETTE[1]])
+            fig = template(fig, 380)
+            fig.update_layout(title='Distribucion de Promedios', bargap=0.05)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab3:
+        dp = datos['planes'].copy()
+        dp['P'] = pd.to_numeric(dp['Puntaje'], errors='coerce')
+
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Evaluaciones", len(dp))
+        with c2: st.metric("Promedio", f"{dp['P'].mean():.1f}/50")
+        with c3: st.metric("Jurados", dp['Jurado'].nunique())
+
+        c1, c2 = st.columns(2)
+        with c1:
+            g = dp.groupby('Grupo')['P'].mean().reset_index()
+            fig = px.bar(g, x='Grupo', y='P', text='P', color='P', color_continuous_scale='RdYlGn')
+            fig = template(fig, 380)
+            fig.update_layout(title='Puntaje por Grupo', coloraxis_showscale=False, yaxis_range=[0, 55])
+            fig.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            j = dp.groupby('Jurado')['P'].mean().reset_index()
+            fig = px.bar(j, x='Jurado', y='P', text='P', color_discrete_sequence=[PALETTE[4]])
+            fig = template(fig, 380)
+            fig.update_layout(title='Puntaje por Jurado', yaxis_range=[0, 55])
+            fig.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+            st.plotly_chart(fig, use_container_width=True)
+
+        fig = px.density_heatmap(dp, x='Grupo', y='Jurado', z='P', text_auto='.0f',
+                                 color_continuous_scale='RdYlGn')
+        fig = template(fig, 350)
+        fig.update_layout(title='Calor: Puntajes por Grupo y Jurado')
+        st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# LINEA BASE VS FINAL
+# ============================================================
+elif pagina == "📈 Linea Base vs Final":
+    st.title("Comparacion: Linea Base vs Linea Final")
+    st.markdown("Evolucion de conocimientos autopercibidos antes y despues del programa")
+    st.markdown("---")
+
+    df_lb = datos['becarios'].copy()
+    df_lf = datos['linea_final'].copy()
+
+    c1, c2, c3 = st.columns(3)
+    with c1: st.metric("Linea Base", f"{len(df_lb)} becarios")
+    with c2: st.metric("Linea Final", f"{len(df_lf)} respuestas")
+    with c3: st.metric("Tasa Respuesta", f"{len(df_lf)/len(df_lb)*100:.0f}%")
+
+    st.markdown("---")
+
+    cn = ['Des. Agrario', 'Agroecologia', 'Enf. Genero', 'Interculturalidad',
+          'Formalizacion', 'CANVA', 'Comercializacion', 'Form. Proyectos', 'Fondos']
+
+    lb_cols = [c for c in df_lb.columns if c.startswith('Conoc_')]
+    lb_m = [df_lb[c].mean() for c in lb_cols]
+
+    m = {'Nada': 1, 'Basico': 2, 'Intermedio': 3, 'Avanzado': 4}
+    lf_m = []
+    for c in range(9, 18):
+        v = df_lf.iloc[:, c].map(m).dropna()
+        lf_m.append(v.mean() if len(v) > 0 else 0)
+    lf_mn = [(v-1) for v in lf_m]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name='Linea Base (0-3)', x=cn, y=lb_m, marker_color=PALETTE[0],
+                          text=[f'{v:.2f}' for v in lb_m], textposition='outside'))
+    fig.add_trace(go.Bar(name='Linea Final (0-3)', x=cn, y=lf_mn, marker_color=PALETTE[1],
+                          text=[f'{v:.2f}' for v in lf_mn], textposition='outside'))
+    fig = template(fig, 480)
+    fig.update_layout(title='Conocimientos: Antes vs Despues', barmode='group', yaxis_range=[0, 3.8])
+    fig.add_hline(y=2, line_dash="dash", line_color="#aaa", annotation_text="Nivel Intermedio")
+    fig.update_xaxes(tickangle=-25)
+    st.plotly_chart(fig, use_container_width=True)
+
+    diff = [lf - lb for lf, lb in zip(lf_mn, lb_m)]
+    diff_c = [PALETTE[3] if d > 0 else PALETTE[1] for d in diff]
+    fig = go.Figure(data=[go.Bar(x=cn, y=diff, marker_color=diff_c,
+                                  text=[f'{d:+.2f}' for d in diff], textposition='outside')])
+    fig = template(fig, 380)
+    fig.update_layout(title='Cambio: Linea Final - Linea Base')
+    fig.add_hline(y=0, line_dash="solid", line_color="#aaa")
+    fig.update_xaxes(tickangle=-25)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Categorias - Linea Final")
+    for col, nombre, color in [('Cat_Aprendido', 'Que Aprendieron', PALETTE[0]),
+                                 ('Cat_TemasFinal', 'Temas de Interes', PALETTE[1]),
+                                 ('Cat_Logrado', 'Que Lograron', PALETTE[2])]:
+        cats = df_lf[col].value_counts().reset_index()
+        cats.columns = ['Categoria', 'Cantidad']
+        fig = px.bar(cats, x='Cantidad', y='Categoria', orientation='h', text='Cantidad',
+                     color_discrete_sequence=[color])
+        fig = template(fig, max(280, len(cats)*38))
+        fig.update_layout(title=nombre, margin=dict(t=50))
+        bar_text(fig)
+        st.plotly_chart(fig, use_container_width=True)
