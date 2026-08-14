@@ -777,6 +777,58 @@ elif pagina == "📈 Linea Base vs Final":
     fig.update_xaxes(tickangle=-25)
     st.plotly_chart(fig, use_container_width=True)
 
+    st.markdown("---")
+    st.subheader("Mapas de Calor Individuales")
+
+    # Preparar datos para heatmaps individuales
+    lb_conoc_cols = [c for c in df_lb.columns if c.startswith('Conoc_')]
+    cn_short = ['Des.Agrario', 'Agroecol.', 'Genero', 'Intercult.', 'Formaliz.',
+                'CANVA', 'Comercial.', 'Form.Proy.', 'Fondos']
+
+    # Linea Base: matriz becario x conocimiento (0-3)
+    lb_matrix = df_lb[['Nombre'] + lb_conoc_cols].copy()
+    lb_matrix.columns = ['Nombre'] + cn_short
+    lb_matrix = lb_matrix.set_index('Nombre')
+
+    # Linea Final: matriz becario x conocimiento (0-3 normalizado)
+    lf_matrix_data = df_lf_f.iloc[:, 2].values  # nombres
+    lf_conoc = df_lf_f.iloc[:, 9:18].map(m)  # cols 9-17, mapear a 1-4
+    lf_conoc = lf_conoc - 1  # normalizar a 0-3
+    lf_matrix = pd.DataFrame(lf_conoc.values, index=lf_matrix_data, columns=cn_short)
+
+    # Heatmap Linea Base
+    fig = px.imshow(lb_matrix, text_auto='.0f', color_continuous_scale='RdYlGn',
+                    zmin=0, zmax=3, aspect='auto',
+                    labels=dict(x="Conocimiento", y="Becario", color="Nivel"))
+    fig = template(fig, max(400, len(lb_matrix)*25))
+    fig.update_layout(title='Linea Base: Nivel de Conocimiento por Becario (0-3)',
+                     coloraxis_colorbar_title="Nivel")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Heatmap Linea Final
+    fig = px.imshow(lf_matrix, text_auto='.0f', color_continuous_scale='RdYlGn',
+                    zmin=0, zmax=3, aspect='auto',
+                    labels=dict(x="Conocimiento", y="Becario", color="Nivel"))
+    fig = template(fig, max(400, len(lf_matrix)*25))
+    fig.update_layout(title='Linea Final: Nivel de Conocimiento por Becario (0-3)',
+                     coloraxis_colorbar_title="Nivel")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Heatmap de Diferencia (solo becarios que aparecen en ambas)
+    common_names = set(lb_matrix.index) & set(lf_matrix.index)
+    if len(common_names) > 0:
+        lb_common = lb_matrix.loc[sorted(common_names)]
+        lf_common = lf_matrix.loc[sorted(common_names)]
+        diff_matrix = lf_common - lb_common
+
+        fig = px.imshow(diff_matrix, text_auto='+.0f', color_continuous_scale='RdBu',
+                        zmin=-3, zmax=3, aspect='auto',
+                        labels=dict(x="Conocimiento", y="Becario", color="Cambio"))
+        fig = template(fig, max(400, len(diff_matrix)*25))
+        fig.update_layout(title='Cambio Individual: Linea Final - Linea Base (verde=mejoro, rojo=bajo)',
+                         coloraxis_colorbar_title="Cambio")
+        st.plotly_chart(fig, use_container_width=True)
+
     st.subheader("Categorias - Linea Final")
     for col, nombre, color in [('Cat_Aprendido', 'Que Aprendieron', PALETTE[0]),
                                  ('Cat_TemasFinal', 'Temas de Interes', PALETTE[1]),
