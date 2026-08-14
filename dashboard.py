@@ -259,6 +259,89 @@ if pagina == "🏠 Resumen General":
         else:
             st.info("No hay datos de encuestas con los filtros seleccionados")
 
+    st.markdown("---")
+
+    # Fila 3: Evolución asistencia + Comparación LB vs LF
+    c1, c2 = st.columns(2)
+    with c1:
+        if len(df_asist) > 0:
+            asist_evol = df_asist.groupby('Fecha_str')['Nombre'].nunique().reset_index()
+            asist_evol.columns = ['Fecha', 'Participantes']
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=asist_evol['Fecha'], y=asist_evol['Participantes'],
+                                      mode='lines+markers+text', line=dict(color=PALETTE[3], width=3),
+                                      marker=dict(size=10),
+                                      text=asist_evol['Participantes'],
+                                      textposition='top center', textfont=dict(size=11, color='#e0e0e0')))
+            fig = template(fig, 380)
+            fig.update_layout(title='Evolucion de Asistencia por Sesion')
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de asistencia")
+
+    with c2:
+        lb_cols = [c for c in df_b.columns if c.startswith('Conoc_')]
+        lb_m = [df_b[c].mean() for c in lb_cols]
+        cn_short = ['Des.Agrario', 'Agroecologia', 'Genero', 'Interculturalidad',
+                    'Formalizacion', 'CANVA', 'Comercializ.', 'Form.Proyectos', 'Fondos']
+
+        m = {'Nada': 1, 'Basico': 2, 'Intermedio': 3, 'Avanzado': 4}
+        lf_m = []
+        for c in range(9, 18):
+            v = df_lf.iloc[:, c].map(m).dropna()
+            lf_m.append(v.mean() if len(v) > 0 else 0)
+        lf_mn = [(v-1) for v in lf_m]
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name='Linea Base', x=cn_short, y=lb_m,
+                              marker_color=PALETTE[0], text=[f'{v:.1f}' for v in lb_m], textposition='outside'))
+        fig.add_trace(go.Bar(name='Linea Final', x=cn_short, y=lf_mn,
+                              marker_color=PALETTE[1], text=[f'{v:.1f}' for v in lf_mn], textposition='outside'))
+        fig = template(fig, 380)
+        fig.update_layout(title='Conocimientos: Antes vs Despues', barmode='group', yaxis_range=[0, 3.8])
+        fig.update_xaxes(tickangle=-35)
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Fila 4: Top temas aprendidos + Top mejoras
+    def filtrar(val):
+        if pd.isna(val): return False
+        return str(val).strip() not in ['Sin respuesta', 'Sin respuesta / Satisfecho']
+
+    c1, c2 = st.columns(2)
+    with c1:
+        if len(df_enc) > 0:
+            df_ideas = df_enc[df_enc['Cat_Ideas'].apply(filtrar)]
+            if len(df_ideas) > 0:
+                top_ideas = df_ideas['Cat_Ideas'].value_counts().head(5).reset_index()
+                top_ideas.columns = ['Tema', 'Cantidad']
+                fig = px.bar(top_ideas, x='Cantidad', y='Tema', orientation='h', text='Cantidad',
+                             color_discrete_sequence=[PALETTE[0]])
+                fig = template(fig, 320)
+                fig.update_layout(title='Top 5 Temas Mas Aprendidos', margin=dict(t=50))
+                bar_text(fig)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de ideas")
+        else:
+            st.info("No hay datos de encuestas")
+
+    with c2:
+        if len(df_enc) > 0:
+            df_mej = df_enc[df_enc['Cat_Mejora'].apply(filtrar)]
+            if len(df_mej) > 0:
+                top_mej = df_mej['Cat_Mejora'].value_counts().head(5).reset_index()
+                top_mej.columns = ['Sugerencia', 'Cantidad']
+                fig = px.bar(top_mej, x='Cantidad', y='Sugerencia', orientation='h', text='Cantidad',
+                             color_discrete_sequence=[PALETTE[2]])
+                fig = template(fig, 320)
+                fig.update_layout(title='Top 5 Sugerencias de Mejora', margin=dict(t=50))
+                bar_text(fig)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No hay datos de mejoras")
+        else:
+            st.info("No hay datos de encuestas")
+
 # ============================================================
 # BECARIOS
 # ============================================================
