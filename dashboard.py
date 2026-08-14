@@ -11,26 +11,30 @@ import os
 # ============================================================
 st.set_page_config(page_title="IX Escuela de Jovenes Ruralistas", page_icon="🌱", layout="wide", initial_sidebar_state="expanded")
 
+# ============================================================
+# TEMA: DARK/LIGHT
+# ============================================================
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = True
+
 st.markdown("""
 <style>
-    .main { background-color: #f5f6fa; }
     .stMetric {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 15px 20px; border-radius: 12px; color: white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
     .stMetric label { color: rgba(255,255,255,0.85) !important; font-size: 0.85rem !important; }
     .stMetric [data-testid="stMetricValue"] { color: white !important; font-size: 1.8rem !important; font-weight: 700 !important; }
     .block-container { padding-top: 1rem; }
-    h1 { color: #1a237e; border-bottom: 3px solid #4CAF50; padding-bottom: 10px; }
-    h2 { color: #283593; }
-    .stTabs [data-baseweb="tab"] { background-color: #e8eaf6; border-radius: 8px 8px 0 0; padding: 10px 20px; font-weight: 600; }
+    h1 { border-bottom: 3px solid #4CAF50; padding-bottom: 10px; }
+    .stTabs [data-baseweb="tab"] { border-radius: 8px 8px 0 0; padding: 10px 20px; font-weight: 600; }
     .stTabs [aria-selected="true"] { background-color: #4CAF50 !important; color: white !important; }
-    div[data-testid="stSidebar"] { background: linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%); }
+    div[data-testid="stSidebar"] { background: linear-gradient(180deg, #0a0d14 0%, #111827 50%, #1a1d24 100%) !important; }
     div[data-testid="stSidebar"] .stRadio label, div[data-testid="stSidebar"] .stSelectbox label,
     div[data-testid="stSidebar"] .stMultiSelect label, div[data-testid="stSidebar"] .stSlider label { color: rgba(255,255,255,0.9) !important; }
-    div[data-testid="stSidebar"] h1 { color: white !important; border-bottom: 2px solid rgba(255,255,255,0.3); }
-    div[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.2); }
+    div[data-testid="stSidebar"] h1 { color: #4CAF50 !important; border-bottom: 2px solid rgba(76,175,80,0.3); }
+    div[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.1); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,21 +45,21 @@ PALETTE = ['#2196F3', '#E91E63', '#FF9800', '#4CAF50', '#9C27B0', '#00BCD4', '#F
 
 def template(fig, height=420):
     fig.update_layout(
-        template='plotly_white',
-        font=dict(family='Segoe UI, sans-serif', size=12, color='#333'),
-        title=dict(font=dict(size=16, color='#1a237e'), x=0.5, xanchor='center'),
+        template='plotly_dark',
+        font=dict(family='Segoe UI, sans-serif', size=12, color='#e0e0e0'),
+        title=dict(font=dict(size=16, color='#4CAF50'), x=0.5, xanchor='center'),
         margin=dict(t=50, b=40, l=40, r=20),
         height=height,
         legend=dict(orientation='h', yanchor='bottom', y=-0.25, xanchor='center', x=0.5, font_size=11),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
     )
-    fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='#eee')
-    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='#eee')
+    fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='rgba(255,255,255,0.08)')
+    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='rgba(255,255,255,0.08)')
     return fig
 
 def bar_text(fig, fmt='%.0f'):
-    fig.update_traces(textposition='outside', textfont_size=11, textfont_color='#333')
+    fig.update_traces(textposition='outside', textfont_size=11, textfont_color='#e0e0e0')
     return fig
 
 # ============================================================
@@ -101,6 +105,15 @@ with st.sidebar:
     st.markdown("### Jovenes Ruralistas")
     st.markdown("---")
     pagina = st.radio("Navegacion", ["🏠 Resumen General", "👥 Becarios", "📋 Encuestas", "📅 Asistencia", "📝 Evaluaciones", "📈 Linea Base vs Final"], label_visibility="collapsed")
+    st.markdown("---")
+    
+    # Toggle dark/light mode
+    tema = st.toggle("Modo Oscuro", value=True)
+    if not tema:
+        st.markdown("""<style>
+            div[data-testid="stSidebar"] { background: linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%) !important; }
+            div[data-testid="stSidebar"] h1 { color: white !important; }
+        </style>""", unsafe_allow_html=True)
     st.markdown("---")
     regiones = ['Todas'] + sorted(datos['becarios']['Region'].dropna().unique().tolist())
     region_filtro = st.selectbox("Region", regiones)
