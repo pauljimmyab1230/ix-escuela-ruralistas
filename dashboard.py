@@ -185,7 +185,6 @@ if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
 # ============================================================
 if pagina == "🏠 Resumen General":
     st.title("Resumen General - IX Escuela de Jovenes Ruralistas")
-    st.markdown(f"**Programa de fortalecimiento de liderazgo juvenil rural** | Mayo - Julio 2026")
     
     # Indicador de filtros activos
     filtros_activos = []
