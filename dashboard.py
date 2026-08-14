@@ -792,7 +792,7 @@ elif pagina == "📈 Linea Base vs Final":
 
     # Linea Final: matriz becario x conocimiento (0-3 normalizado)
     lf_matrix_data = df_lf_f.iloc[:, 2].values  # nombres
-    lf_conoc = df_lf_f.iloc[:, 9:18].map(m)  # cols 9-17, mapear a 1-4
+    lf_conoc = df_lf_f.iloc[:, 9:18].replace(m)  # cols 9-17, mapear a 1-4
     lf_conoc = lf_conoc - 1  # normalizar a 0-3
     lf_matrix = pd.DataFrame(lf_conoc.values, index=lf_matrix_data, columns=cn_short)
 
