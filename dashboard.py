@@ -122,34 +122,65 @@ with st.sidebar:
     st.markdown("---")
     st.caption("IX Escuela de Jovenes Ruralistas 2026 | Ypard / EJR")
 
+# Aplicar filtros globalmente
 df_b = datos['becarios'].copy()
-if region_filtro != 'Todas': df_b = df_b[df_b['Region'] == region_filtro]
-if genero_filtro != 'Todos': df_b = df_b[df_b['Genero'] == genero_filtro]
+if region_filtro != 'Todas':
+    df_b = df_b[df_b['Region'] == region_filtro]
+if genero_filtro != 'Todos':
+    df_b = df_b[df_b['Genero'] == genero_filtro]
+
+# Filtrar asistencia por becarios filtrados
+emails_filtrados = set(df_b['Email'].dropna().str.strip().str.lower())
+df_asist = datos['asistencia'].copy()
+if region_filtro != 'Todas' or genero_filtro != 'Todos':
+    df_asist = df_asist[df_asist['Correo electrónico'].str.strip().str.lower().isin(emails_filtrados)]
+
+# Filtrar encuestas por becarios filtrados
+df_enc = datos['enc_f'].copy()
+if region_filtro != 'Todas' or genero_filtro != 'Todos':
+    df_enc = df_enc[df_enc['Correo'].str.strip().str.lower().isin(emails_filtrados)]
+
+# Filtrar examen
+df_exam = datos['examen'].copy()
+if region_filtro != 'Todas' or genero_filtro != 'Todos':
+    df_exam = df_exam[df_exam['Correo'].str.strip().str.lower().isin(emails_filtrados)]
+
+# Filtrar entregables
+df_ent = datos['entregables'].copy()
+if region_filtro != 'Todas' or genero_filtro != 'Todos':
+    df_ent = df_ent[df_ent['Correo'].str.strip().str.lower().isin(emails_filtrados)]
+
+# Filtrar linea final
+df_lf = datos['linea_final'].copy()
+if region_filtro != 'Todas' or genero_filtro != 'Todos':
+    df_lf = df_lf[df_lf.iloc[:, 1].astype(str).str.strip().str.lower().isin(emails_filtrados)]
 
 # ============================================================
 # RESUMEN GENERAL
 # ============================================================
 if pagina == "🏠 Resumen General":
     st.title("Resumen General - IX Escuela de Jovenes Ruralistas")
-    st.markdown("**Programa de fortalecimiento de liderazgo juvenil rural** | Mayo - Julio 2026")
+    st.markdown(f"**Programa de fortalecimiento de liderazgo juvenil rural** | Mayo - Julio 2026")
+    if region_filtro != 'Todas' or genero_filtro != 'Todos':
+        st.markdown(f"Filtros: **Region:** {region_filtro} | **Genero:** {genero_filtro}")
     st.markdown("---")
 
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.metric("Becarios", len(datos['becarios']))
+    with c1: st.metric("Becarios", len(df_b))
     with c2: st.metric("Mentores", len(datos['mentores']))
     with c3: st.metric("Sesiones", 10)
-    with c4: st.metric("Encuestas", len(datos['enc_f']))
+    with c4: st.metric("Encuestas", len(df_enc))
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("Representantes", len(datos['representantes']))
     with c2: st.metric("Equipos", 10)
-    with c3: st.metric("Registros Asistencia", f"{len(datos['asistencia']):,}")
-    with c4: st.metric("Participantes Unicos", datos['asistencia']['Nombre'].nunique())
+    with c3: st.metric("Registros Asistencia", f"{len(df_asist):,}")
+    with c4: st.metric("Participantes Unicos", df_asist['Nombre'].nunique() if len(df_asist) > 0 else 0)
 
     st.markdown("---")
 
     c1, c2 = st.columns(2)
     with c1:
-        gen = datos['becarios']['Genero'].value_counts()
+        gen = df_b['Genero'].value_counts()
         fig = go.Figure(data=[go.Pie(labels=gen.index, values=gen.values, hole=0.45,
                                      marker_colors=[PALETTE[1], PALETTE[0]],
                                      textinfo='percent+label', textfont_size=13,
@@ -159,7 +190,7 @@ if pagina == "🏠 Resumen General":
         st.plotly_chart(fig, use_container_width=True)
 
     with c2:
-        pais = datos['becarios']['Pais'].value_counts().reset_index()
+        pais = df_b['Pais'].value_counts().reset_index()
         pais.columns = ['Pais', 'Cantidad']
         fig = px.bar(pais, x='Pais', y='Cantidad', text='Cantidad', color='Cantidad',
                      color_continuous_scale=['#90CAF9', '#1565C0'])
@@ -170,27 +201,33 @@ if pagina == "🏠 Resumen General":
 
     c1, c2 = st.columns(2)
     with c1:
-        asist = datos['asistencia'].groupby('Fecha_str')['Nombre'].nunique().reset_index()
-        asist.columns = ['Fecha', 'Participantes']
-        fig = px.bar(asist, x='Fecha', y='Participantes', text='Participantes',
-                     color_discrete_sequence=[PALETTE[3]])
-        fig = template(fig, 380)
-        fig.update_layout(title='Participantes por Sesion')
-        bar_text(fig)
-        st.plotly_chart(fig, use_container_width=True)
+        if len(df_asist) > 0:
+            asist = df_asist.groupby('Fecha_str')['Nombre'].nunique().reset_index()
+            asist.columns = ['Fecha', 'Participantes']
+            fig = px.bar(asist, x='Fecha', y='Participantes', text='Participantes',
+                         color_discrete_sequence=[PALETTE[3]])
+            fig = template(fig, 380)
+            fig.update_layout(title='Participantes por Sesion')
+            bar_text(fig)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de asistencia con los filtros seleccionados")
 
     with c2:
-        cal = datos['enc_f'].groupby('Sesion')['Calif_num'].mean().reset_index()
-        cal.columns = ['Sesion', 'Calificacion']
-        cal['Label'] = cal['Sesion'].map(lambda x: f"S{x}")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=cal['Label'], y=cal['Calificacion'], mode='lines+markers+text',
-                                  line=dict(color=PALETTE[0], width=3), marker=dict(size=10),
-                                  text=[f'{v:.2f}' for v in cal['Calificacion']],
-                                  textposition='top center', textfont=dict(size=11, color='#333')))
-        fig = template(fig, 380)
-        fig.update_layout(title='Calificacion Promedio por Sesion', yaxis_range=[3.5, 5.5])
-        st.plotly_chart(fig, use_container_width=True)
+        if len(df_enc) > 0:
+            cal = df_enc.groupby('Sesion')['Calif_num'].mean().reset_index()
+            cal.columns = ['Sesion', 'Calificacion']
+            cal['Label'] = cal['Sesion'].map(lambda x: f"S{x}")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=cal['Label'], y=cal['Calificacion'], mode='lines+markers+text',
+                                      line=dict(color=PALETTE[0], width=3), marker=dict(size=10),
+                                      text=[f'{v:.2f}' for v in cal['Calificacion']],
+                                      textposition='top center', textfont=dict(size=11, color='#e0e0e0')))
+            fig = template(fig, 380)
+            fig.update_layout(title='Calificacion Promedio por Sesion', yaxis_range=[3.5, 5.5])
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos de encuestas con los filtros seleccionados")
 
 # ============================================================
 # BECARIOS
@@ -340,10 +377,10 @@ elif pagina == "📋 Encuestas":
     st.markdown("Resultados de las encuestas (sin sesion 1 - bienvenida)")
     st.markdown("---")
 
-    ses_f = st.multiselect("Sesiones", sorted(datos['enc_f']['Sesion'].unique()),
-                            default=sorted(datos['enc_f']['Sesion'].unique()),
+    ses_f = st.multiselect("Sesiones", sorted(df_enc['Sesion'].unique()),
+                            default=sorted(df_enc['Sesion'].unique()),
                             format_func=lambda x: f"S{x}: {sesion_nombres.get(x, '')}")
-    df_enc = datos['enc_f'][datos['enc_f']['Sesion'].isin(ses_f)]
+    df_enc = df_enc[df_enc['Sesion'].isin(ses_f)]
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("Encuestas", len(df_enc))
@@ -413,7 +450,7 @@ elif pagina == "📅 Asistencia":
     st.title("Analisis de Asistencia")
     st.markdown("---")
 
-    df_a = datos['asistencia'].copy()
+    df_a = df_asist.copy()
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("Total Registros", f"{len(df_a):,}")
@@ -465,7 +502,7 @@ elif pagina == "📝 Evaluaciones":
     tab1, tab2, tab3 = st.tabs(["Examen Inicial", "Entregables", "Planes de Emprendimiento"])
 
     with tab1:
-        de = datos['examen'].copy()
+        de = df_exam.copy()
         de['Puntaje'] = pd.to_numeric(de['Puntuacion'], errors='coerce')
         aprob = (de['Puntaje'] >= 18).sum()
 
@@ -495,7 +532,7 @@ elif pagina == "📝 Evaluaciones":
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        ent = datos['entregables'].copy()
+        ent = df_ent.copy()
         ent_cols = ['Entregable_1', 'Entregable_2', 'Entregable_3', 'Entregable_4', 'Entregable_5']
         ec = [ent[c].notna().sum() for c in ent_cols]
         fig = go.Figure(data=[go.Bar(x=ent_cols, y=ec, marker_color=PALETTE[:5],
@@ -555,13 +592,13 @@ elif pagina == "📈 Linea Base vs Final":
     st.markdown("Evolucion de conocimientos autopercibidos antes y despues del programa")
     st.markdown("---")
 
-    df_lb = datos['becarios'].copy()
-    df_lf = datos['linea_final'].copy()
+    df_lb = df_b.copy()
+    df_lf_f = df_lf.copy()
 
     c1, c2, c3 = st.columns(3)
     with c1: st.metric("Linea Base", f"{len(df_lb)} becarios")
-    with c2: st.metric("Linea Final", f"{len(df_lf)} respuestas")
-    with c3: st.metric("Tasa Respuesta", f"{len(df_lf)/len(df_lb)*100:.0f}%")
+    with c2: st.metric("Linea Final", f"{len(df_lf_f)} respuestas")
+    with c3: st.metric("Tasa Respuesta", f"{len(df_lf_f)/len(df_lb)*100:.0f}%")
 
     st.markdown("---")
 
