@@ -829,6 +829,66 @@ elif pagina == "📈 Linea Base vs Final":
                          coloraxis_colorbar_title="Cambio")
         st.plotly_chart(fig, use_container_width=True)
 
+    st.subheader("Comparativa: Que esperaba aprender vs Que aprendio")
+
+    # Normalizar categorías para comparar
+    map_lb = {
+        'Agroecología': 'Agroecologia',
+        'Agroecolog�a': 'Agroecologia',
+        'Emprendimiento rural': 'Emprendimiento',
+        'Herramientas prácticas': 'Herramientas',
+        'Herramientas pr�cticas': 'Herramientas',
+        'General / Otros': 'Otros',
+        'Investigación': 'Investigacion',
+        'Investigaci�n': 'Investigacion',
+        'Formulación de proyectos': 'Formulacion',
+        'Formulaci�n de proyectos': 'Formulacion',
+        'Liderazgo juvenil': 'Liderazgo',
+    }
+    map_lf = {
+        'Agroecologia y Suelos': 'Agroecologia',
+        'Emprendimiento Rural': 'Emprendimiento',
+        'Conocimientos y Herramientas': 'Herramientas',
+        'Realidad Rural y Politicas': 'Realidad Rural',
+        'Formulacion de Proyectos': 'Formulacion',
+        'Interculturalidad': 'Interculturalidad',
+        'Liderazgo y Habilidades': 'Liderazgo',
+        'Modelo CANVAS': 'CANVAS',
+    }
+
+    esperaba = df_lb['Cat_QueEsperaAprender'].map(map_lb).value_counts().reset_index()
+    esperaba.columns = ['Categoria', 'Esperaba']
+
+    aprendio = df_lf['Cat_Aprendido'].map(map_lf).value_counts().reset_index()
+    aprendio.columns = ['Categoria', 'Aprendio']
+
+    comp = pd.merge(esperaba, aprendio, on='Categoria', how='outer').fillna(0)
+    comp['Esperaba'] = comp['Esperaba'].astype(int)
+    comp['Aprendio'] = comp['Aprendio'].astype(int)
+    comp = comp.sort_values('Esperaba', ascending=True)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(name='Esperaba Aprender (Linea Base)', y=comp['Categoria'],
+                          x=comp['Esperaba'], orientation='h',
+                          marker_color=PALETTE[0], text=comp['Esperaba'], textposition='outside'))
+    fig.add_trace(go.Bar(name='Aprendio (Linea Final)', y=comp['Categoria'],
+                          x=comp['Aprendio'], orientation='h',
+                          marker_color=PALETTE[1], text=comp['Aprendio'], textposition='outside'))
+    fig = template(fig, max(350, len(comp)*45))
+    fig.update_layout(title='Expectativas vs Resultados', barmode='group')
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Diferencia
+    comp['Diff'] = comp['Aprendio'] - comp['Esperaba']
+    diff_colors = [PALETTE[3] if d > 0 else PALETTE[6] if d < 0 else '#888' for d in comp['Diff']]
+    fig = go.Figure(data=[go.Bar(y=comp['Categoria'], x=comp['Diff'], orientation='h',
+                                  marker_color=diff_colors,
+                                  text=[f'{d:+d}' for d in comp['Diff']], textposition='outside')])
+    fig = template(fig, max(300, len(comp)*40))
+    fig.update_layout(title='Diferencia: Aprendio - Esperaba (verde=supero expectativas, rojo=por debajo)')
+    fig.add_vline(x=0, line_dash="solid", line_color="#aaa")
+    st.plotly_chart(fig, use_container_width=True)
+
     st.subheader("Categorias - Linea Final")
     for col, nombre, color in [('Cat_Aprendido', 'Que Aprendieron', PALETTE[0]),
                                  ('Cat_TemasFinal', 'Temas de Interes', PALETTE[1]),
