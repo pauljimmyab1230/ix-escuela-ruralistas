@@ -119,6 +119,27 @@ with st.sidebar:
     region_filtro = st.selectbox("Region", regiones)
     generos = ['Todos'] + sorted(datos['becarios']['Genero'].dropna().unique().tolist())
     genero_filtro = st.selectbox("Genero", generos)
+    
+    st.markdown("---")
+    st.markdown("### Filtro Individual")
+    
+    # Preparar lista de becarios para filtro
+    becarios_lista = datos['becarios'][['Nombre', 'Email']].copy()
+    becarios_lista['Label'] = becarios_lista['Nombre'] + ' (' + becarios_lista['Email'].str[:20] + '...)'
+    becarios_lista = becarios_lista.sort_values('Nombre')
+    
+    becarios_seleccionados = st.multiselect(
+        "Seleccionar Becario(s)",
+        options=becarios_lista['Label'].tolist(),
+        default=[],
+        help="Selecciona uno o varios becarios para ver sus datos individuales"
+    )
+    
+    if becarios_seleccionados:
+        emails_seleccionados = becarios_lista[becarios_lista['Label'].isin(becarios_seleccionados)]['Email'].tolist()
+    else:
+        emails_seleccionados = None
+    
     st.markdown("---")
     st.caption("IX Escuela de Jovenes Ruralistas 2026 | Ypard / EJR")
 
@@ -129,30 +150,34 @@ if region_filtro != 'Todas':
 if genero_filtro != 'Todos':
     df_b = df_b[df_b['Genero'] == genero_filtro]
 
+# Filtro individual por becario
+if emails_seleccionados:
+    df_b = df_b[df_b['Email'].isin(emails_seleccionados)]
+
 # Filtrar asistencia por becarios filtrados
 emails_filtrados = set(df_b['Email'].dropna().str.strip().str.lower())
 df_asist = datos['asistencia'].copy()
-if region_filtro != 'Todas' or genero_filtro != 'Todos':
+if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
     df_asist = df_asist[df_asist['Correo electrónico'].str.strip().str.lower().isin(emails_filtrados)]
 
 # Filtrar encuestas por becarios filtrados
 df_enc = datos['enc_f'].copy()
-if region_filtro != 'Todas' or genero_filtro != 'Todos':
+if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
     df_enc = df_enc[df_enc['Correo'].str.strip().str.lower().isin(emails_filtrados)]
 
 # Filtrar examen
 df_exam = datos['examen'].copy()
-if region_filtro != 'Todas' or genero_filtro != 'Todos':
+if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
     df_exam = df_exam[df_exam['Correo'].str.strip().str.lower().isin(emails_filtrados)]
 
 # Filtrar entregables
 df_ent = datos['entregables'].copy()
-if region_filtro != 'Todas' or genero_filtro != 'Todos':
+if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
     df_ent = df_ent[df_ent['Correo'].str.strip().str.lower().isin(emails_filtrados)]
 
 # Filtrar linea final
 df_lf = datos['linea_final'].copy()
-if region_filtro != 'Todas' or genero_filtro != 'Todos':
+if emails_seleccionados or region_filtro != 'Todas' or genero_filtro != 'Todos':
     df_lf = df_lf[df_lf.iloc[:, 1].astype(str).str.strip().str.lower().isin(emails_filtrados)]
 
 # ============================================================
@@ -161,8 +186,14 @@ if region_filtro != 'Todas' or genero_filtro != 'Todos':
 if pagina == "🏠 Resumen General":
     st.title("Resumen General - IX Escuela de Jovenes Ruralistas")
     st.markdown(f"**Programa de fortalecimiento de liderazgo juvenil rural** | Mayo - Julio 2026")
-    if region_filtro != 'Todas' or genero_filtro != 'Todos':
-        st.markdown(f"Filtros: **Region:** {region_filtro} | **Genero:** {genero_filtro}")
+    
+    # Indicador de filtros activos
+    filtros_activos = []
+    if region_filtro != 'Todas': filtros_activos.append(f"Region: {region_filtro}")
+    if genero_filtro != 'Todos': filtros_activos.append(f"Genero: {genero_filtro}")
+    if emails_seleccionados: filtros_activos.append(f"Becarios: {len(emails_seleccionados)}")
+    if filtros_activos:
+        st.markdown(f"**Filtros activos:** {' | '.join(filtros_activos)} | **Mostrando:** {len(df_b)} becarios")
     st.markdown("---")
 
     c1, c2, c3, c4 = st.columns(4)
@@ -234,7 +265,10 @@ if pagina == "🏠 Resumen General":
 # ============================================================
 elif pagina == "👥 Becarios":
     st.title("Analisis de Becarios")
-    st.markdown(f"**Region:** {region_filtro} | **Genero:** {genero_filtro} | **Becarios:** {len(df_b)}")
+    filtros_b = [f"**Region:** {region_filtro}", f"**Genero:** {genero_filtro}"]
+    if emails_seleccionados:
+        filtros_b.append(f"**Becarios seleccionados:** {len(emails_seleccionados)}")
+    st.markdown(f"{' | '.join(filtros_b)} | **Mostrando:** {len(df_b)}")
     st.markdown("---")
 
     tab1, tab2, tab3, tab4 = st.tabs(["Demografia", "Conocimientos", "Emprendimiento", "Preguntas Abiertas"])
@@ -368,6 +402,31 @@ elif pagina == "👥 Becarios":
             fig.update_layout(title=f'{nombre} ({len(df_b)} respuestas)', margin=dict(t=50))
             bar_text(fig)
             st.plotly_chart(fig, use_container_width=True)
+    
+    # Perfil individual (solo si se selecciono 1 becario)
+    if emails_seleccionados and len(emails_seleccionados) == 1:
+        st.markdown("---")
+        st.subheader("Perfil Individual del Becario")
+        bec = df_b.iloc[0]
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("Nombre", bec['Nombre'])
+        with c2: st.metric("Edad", bec['Edad'])
+        with c3: st.metric("Region", bec['Region'])
+        with c4: st.metric("Genero", bec['Genero'])
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("Pais", bec['Pais'])
+        with c2: st.metric("Nivel Educativo", bec['Nivel educativo'])
+        with c3: st.metric("Lengua Materna", bec['Lengua materna'])
+        with c4: st.metric("Vinculo Rural", bec['Vinculo_Rural'])
+        
+        st.markdown("**Conocimientos Autopercibidos:**")
+        for col in [c for c in df_b.columns if c.startswith('Conoc_')]:
+            nombre_c = col.replace('Conoc_', '')
+            valor = bec[col]
+            barra = '█' * int(valor) + '░' * (3 - int(valor))
+            st.markdown(f"- {nombre_c}: **{valor}/3** {barra}")
 
 # ============================================================
 # ENCUESTAS
