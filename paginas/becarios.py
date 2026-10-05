@@ -16,6 +16,7 @@ from core.config import (
 from core.datos import Contexto
 from core.graficos import con_valores, graficar, plantilla
 from paginas.comunes import encabezado_filtros
+from src import indicadores as ind
 from src.datos import columnas_conocimiento
 
 
@@ -63,7 +64,12 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
         return
 
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["Demografía", "Conocimientos", "Emprendimiento", "Preguntas abiertas"]
+        [
+            "Demografía",
+            "Conocimientos",
+            "Experiencia y redes",
+            "Preguntas abiertas",
+        ]
     )
 
     with tab1:
@@ -167,6 +173,89 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
             figura.update_layout(title="Tiempo de Vínculo Rural")
             graficar(con_valores(figura, oscuro=oscuro))
 
+        st.markdown("##### Edad por rangos")
+        rangos = ind.perfil_por_rangos_de_edad(becarios)
+        tabla_rangos = rangos.reset_index()
+        tabla_rangos.columns = ["Rango", "Cantidad"]
+        tabla_rangos["%"] = (tabla_rangos["Cantidad"] / max(len(becarios), 1) * 100).round(1)
+        figura = px.bar(
+            tabla_rangos,
+            x="Rango",
+            y="Cantidad",
+            text="Cantidad",
+            color_discrete_sequence=[PALETA[0]],
+        )
+        plantilla(figura, 350, oscuro=oscuro)
+        figura.update_layout(title="Distribución por Rango de Edad")
+        graficar(con_valores(figura, oscuro=oscuro))
+
+        c1, c2 = st.columns(2)
+        with c1:
+            regiones = ind.perfil_por_region_peru(becarios)
+            if not regiones.empty:
+                tabla_regiones = regiones.reset_index()
+                tabla_regiones.columns = ["Región", "Cantidad"]
+                figura = px.bar(
+                    tabla_regiones,
+                    x="Cantidad",
+                    y="Región",
+                    orientation="h",
+                    text="Cantidad",
+                    color_discrete_sequence=[PALETA[3]],
+                )
+                plantilla(figura, max(320, len(tabla_regiones) * 26), oscuro=oscuro)
+                figura.update_layout(title="Distribución por Región (Perú)")
+                graficar(con_valores(figura, oscuro=oscuro))
+            else:
+                st.info("No hay becarios del Perú con los filtros seleccionados.")
+
+        with c2:
+            especialidades = ind.perfil_por_especialidad(becarios)
+            if not especialidades.empty:
+                tabla_esp = especialidades.reset_index()
+                tabla_esp.columns = ["Especialidad", "Cantidad"]
+                figura = px.bar(
+                    tabla_esp,
+                    x="Cantidad",
+                    y="Especialidad",
+                    orientation="h",
+                    text="Cantidad",
+                    color_discrete_sequence=[PALETA[4]],
+                )
+                plantilla(figura, max(320, len(tabla_esp) * 26), oscuro=oscuro)
+                figura.update_layout(title="Distribución por Especialidad")
+                graficar(con_valores(figura, oscuro=oscuro))
+            else:
+                st.info("Sin datos de especialidad.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            tabla_paises = ind.perfil_por_pais(becarios).reset_index()
+            tabla_paises.columns = ["País", "Cantidad"]
+            figura = px.bar(
+                tabla_paises,
+                x="País",
+                y="Cantidad",
+                text="Cantidad",
+                color_discrete_sequence=[PALETA[6]],
+            )
+            plantilla(figura, 350, oscuro=oscuro)
+            figura.update_layout(title="Distribución por País")
+            graficar(con_valores(figura, oscuro=oscuro))
+        with c2:
+            redes = ind.perfil_redes_jovenes(becarios)
+            if not redes.empty:
+                figura = px.bar(
+                    redes,
+                    x="Pertenece",
+                    y="Cantidad",
+                    text="Cantidad",
+                    color_discrete_sequence=[PALETA[5]],
+                )
+                plantilla(figura, 350, oscuro=oscuro)
+                figura.update_layout(title="Pertenencia a Redes Juveniles")
+                graficar(con_valores(figura, oscuro=oscuro))
+
     with tab2:
         columnas = columnas_conocimiento(becarios)
         nombres = [c.replace("Conoc_", "") for c in columnas]
@@ -260,6 +349,37 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
         plantilla(figura, 500, oscuro=oscuro)
         figura.update_layout(title="Experiencia y Emprendimiento", showlegend=False)
         graficar(figura)
+
+        st.markdown("##### Participación previa en emprendimientos")
+        previa = ind.perfil_emprendimiento_previo(becarios)
+        if not previa.empty:
+            largo = previa.melt(id_vars="Indicador", var_name="Respuesta", value_name="Cantidad")
+            figura = px.bar(
+                largo,
+                x="Cantidad",
+                y="Indicador",
+                color="Respuesta",
+                orientation="h",
+                text="Cantidad",
+                barmode="group",
+                color_discrete_sequence=[PALETA[3], PALETA[1]],
+            )
+            plantilla(figura, max(320, len(previa) * 52), oscuro=oscuro)
+            figura.update_layout(title="Participación previa e inserción en emprendimiento rural")
+            graficar(con_valores(figura, oscuro=oscuro))
+            st.caption(
+                "Cada barra es un indicador del formulario de línea base. "
+                f"Base: {len(becarios)} becarios."
+            )
+
+        st.markdown("##### Redes juveniles")
+        redes = ind.redes_mencionadas(becarios)
+        if not redes.empty:
+            tabla_redes = redes.reset_index()
+            tabla_redes.columns = ["Red mencionada", "Menciones"]
+            st.dataframe(tabla_redes, width="stretch", hide_index=True)
+        else:
+            st.info("Ningún becario nombró una red juvenil concreta.")
 
         for columna, nombre in (
             ("Comodidad_Publico", "Comodidad hablando en público"),

@@ -25,7 +25,15 @@ from core.datos import (
     opciones_de_filtros,
 )
 from core.graficos import aplicar_tema_css
-from paginas import asistencia, becarios, encuestas, evaluaciones, linea_final, resumen
+from paginas import (
+    asistencia,
+    becarios,
+    encuestas,
+    evaluaciones,
+    linea_final,
+    participacion,
+    resumen,
+)
 
 st.set_page_config(
     page_title=TITULO_APP,
@@ -36,6 +44,7 @@ st.set_page_config(
 
 _PAGINAS_RENDER = {
     "resumen": resumen.mostrar,
+    "participacion": participacion.mostrar,
     "becarios": becarios.mostrar,
     "encuestas": encuestas.mostrar,
     "asistencia": asistencia.mostrar,

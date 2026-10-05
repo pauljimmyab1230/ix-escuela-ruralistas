@@ -19,11 +19,18 @@ from paginas.comunes import (
     figura_cambio_conocimientos,
     figura_conocimientos_antes_despues,
 )
+from src import indicadores as ind
 from src.datos import (
     matriz_conocimiento_linea_base,
     matriz_conocimiento_linea_final,
     tabla_expectativas_vs_resultados,
 )
+from src.indicadores import (
+    PREFIJO_ACTORES,
+    PREFIJO_COMODIDAD_PUBLICO,
+    PREFIJO_LIDERAZGO,
+)
+from src.normalizacion import ESCALA_ACTORES, ESCALA_COMODIDAD, ESCALA_LIDERAZGO
 
 
 def _heatmap(matriz: pd.DataFrame, titulo: str, oscuro: bool, *, diferencia: bool) -> go.Figure:
@@ -109,6 +116,84 @@ def _expectativas_vs_resultados(contexto: Contexto, oscuro: bool) -> None:
     graficar(figura)
 
 
+def _cambio_habilidades(contexto: Contexto, oscuro: bool) -> None:
+    """Cambio en las tres habilidades blandas medidas antes y después."""
+    st.subheader("Cambio en habilidades blandas")
+
+    resumen = ind.comparacion_habilidades(contexto.libro)
+    if resumen.empty:
+        st.info("No hay datos comparables de habilidades blandas.")
+        return
+
+    st.caption(
+        "Escala ordinal de comodidad: 1 = muy incómodo … 5 = muy cómodo. "
+        "Liderazgo y reconocimiento de actores: 0 = no, 1 = tal vez / más o "
+        "menos, 2 = sí."
+    )
+
+    tabla = resumen.rename(
+        columns={
+            "Habilidad": "Habilidad",
+            "LineaBase_Prom": "Línea base (prom.)",
+            "LineaBase_n": "n base",
+            "LineaFinal_Prom": "Línea final (prom.)",
+            "LineaFinal_n": "n final",
+            "Pareado_Prom": "Pareado (prom.)",
+            "Pareado_n": "n pareado",
+        }
+    )
+    columnas_visibles = [
+        "Habilidad",
+        "Línea base (prom.)",
+        "n base",
+        "Línea final (prom.)",
+        "n final",
+        "Pareado (prom.)",
+        "n pareado",
+    ]
+    st.dataframe(tabla[columnas_visibles], width="stretch", hide_index=True)
+
+    definiciones = [
+        ("Comodidad para hablar en público", PREFIJO_COMODIDAD_PUBLICO, ESCALA_COMODIDAD),
+        ("Capacidad de liderazgo", PREFIJO_LIDERAZGO, ESCALA_LIDERAZGO),
+        (
+            "Reconocimiento de actores de la comunidad",
+            PREFIJO_ACTORES,
+            ESCALA_ACTORES,
+        ),
+    ]
+
+    for etiqueta, prefijo, escala in definiciones:
+        try:
+            distribucion = ind.distribucion_habilidad(contexto.libro, prefijo, escala)
+        except KeyError:
+            continue
+        if distribucion.empty:
+            continue
+
+        largo = distribucion.melt(id_vars="Nivel", var_name="Medición", value_name="Cantidad")
+        figura = px.bar(
+            largo,
+            x="Nivel",
+            y="Cantidad",
+            color="Medición",
+            barmode="group",
+            text="Cantidad",
+            color_discrete_sequence=[PALETA[0], PALETA[1]],
+        )
+        plantilla(figura, 360, oscuro=oscuro)
+        figura.update_layout(
+            title=f"{etiqueta}: antes y después",
+            legend=dict(orientation="h", y=-0.25),
+        )
+        graficar(con_valores(figura, oscuro=oscuro))
+
+    st.caption(
+        "La columna «Pareado» compara solo a quienes respondieron las dos "
+        "mediciones; el número exacto se indica en cada fila."
+    )
+
+
 def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
     """Renderiza la página de línea base vs línea final."""
     st.title("Comparación: Línea Base vs Línea Final")
@@ -117,17 +202,32 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
     st.markdown("---")
 
     libro = contexto.libro
-    total_base = len(contexto.becarios)
-    total_final = len(contexto.linea_final)
+    poblaciones = ind.poblaciones_de_mediciones(libro)
+    total_base = poblaciones["Linea base"]
+    total_final = poblaciones["Linea final"]
+    comunes = poblaciones["Ambas mediciones"]
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.metric("Línea Base", f"{total_base} becarios")
     with c2:
         st.metric("Línea Final", f"{total_final} respuestas")
     with c3:
+        st.metric("Con ambas mediciones", f"{comunes} becarios")
+    with c4:
         tasa = (total_final / total_base * 100) if total_base else 0
         st.metric("Tasa de respuesta", f"{tasa:.0f}%")
+
+    st.warning(
+        "**Las dos mediciones tienen muestras distintas.** La línea base "
+        f"cubre a {total_base} becarios inscritos y la línea final a "
+        f"{total_final} personas que respondieron el formulario de cierre; "
+        f"solo {comunes} aparecen en ambas. Los promedios comparados de las "
+        "dos primeras gráficas se calculan sobre cada muestra por separado, "
+        "por lo que reflejan tanto el cambio real como la diferencia de "
+        "quién respondió. Los mapas de calor individuales y la comparación "
+        "pareada usan únicamente a los que tienen ambas mediciones."
+    )
 
     st.markdown("---")
 
@@ -184,6 +284,9 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
         st.caption(f"Solo se comparan los {len(comunes)} becarios presentes en ambas mediciones.")
     else:
         st.info("No hay becarios presentes en ambas mediciones para comparar.")
+
+    st.markdown("---")
+    _cambio_habilidades(contexto, oscuro)
 
     st.markdown("---")
     _expectativas_vs_resultados(contexto, oscuro)

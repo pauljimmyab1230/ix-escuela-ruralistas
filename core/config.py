@@ -69,6 +69,7 @@ CONOCIMIENTOS_CORTOS: list[str] = [
 # Páginas del sidebar, en orden.
 PAGINAS: list[tuple[str, str]] = [
     ("🏠 Resumen General", "resumen"),
+    ("📊 Participación", "participacion"),
     ("👥 Becarios", "becarios"),
     ("📋 Encuestas", "encuestas"),
     ("📅 Asistencia", "asistencia"),

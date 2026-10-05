@@ -14,6 +14,7 @@ from core.config import (
 )
 from core.datos import Contexto, es_respuesta_util
 from core.graficos import con_valores, graficar, plantilla
+from src import indicadores as ind
 
 
 def _nombre_sesion(numero: float | int) -> str:
@@ -62,7 +63,9 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
         )
 
     st.markdown("---")
-    tab1, tab2, tab3 = st.tabs(["Calificación", "Categorías abiertas", "Detalle por sesión"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Calificación", "Categorías abiertas", "Detalle por sesión", "Escalas por sesión"]
+    )
 
     with tab1:
         tabla = encuestas.groupby("Sesion_num")["Calif_num"].mean().reset_index()
@@ -156,3 +159,84 @@ def mostrar(contexto: Contexto, *, oscuro: bool = True) -> None:
                         st.caption("Sin respuestas.")
                     for categoria, cantidad in conteo.items():
                         st.markdown(f"- {categoria}: **{cantidad}**")
+
+    with tab4:
+        st.subheader("Utilidad, claridad y aprendizaje por sesión")
+        escalas = ind.escalas_por_sesion(contexto.libro)
+        if escalas.empty:
+            st.info("No hay escalas de satisfacción registradas.")
+            return
+
+        escalas = escalas[escalas["Sesion"].isin(sesiones_elegidas)].copy()
+        if escalas.empty:
+            st.info("Ninguna sesión seleccionada tiene escalas registradas.")
+            return
+
+        escalas["Etiqueta"] = escalas["Sesion"].map(
+            lambda s: f"S{int(s)} · {_nombre_sesion(s)[:16]}"
+        )
+
+        for columna, etiqueta, color in (
+            ("Utilidad", "Utilidad de los temas y talleres", PALETA[0]),
+            ("Claridad", "Claridad del tema desarrollado", PALETA[3]),
+            ("Aprendizaje", "Aprendizaje percibido", PALETA[2]),
+        ):
+            if columna not in escalas.columns:
+                continue
+            valido = escalas.dropna(subset=[columna])
+            if valido.empty:
+                st.info(f"Sin respuestas de «{etiqueta}».")
+                continue
+
+            figura = px.bar(
+                valido,
+                x="Etiqueta",
+                y=columna,
+                text=columna,
+                color_discrete_sequence=[color],
+            )
+            plantilla(figura, 380, oscuro=oscuro)
+            figura.update_layout(
+                title=f"{etiqueta} (promedio 1-5)",
+                yaxis_range=[0, 5.4],
+            )
+            figura.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+            graficar(figura)
+            st.caption(
+                "n de respuestas por sesión: "
+                + ", ".join(
+                    f"S{int(s)}={int(n)}"
+                    for s, n in zip(valido["Sesion"], valido[f"{columna}_n"], strict=True)
+                    if pd.notna(n)
+                )
+            )
+
+        st.markdown("---")
+        st.subheader("Satisfacción y metodología")
+        hay_satisfaccion = (
+            "Satisfaccion" in escalas.columns and escalas["Satisfaccion"].notna().any()
+        )
+        if not hay_satisfaccion:
+            st.info(
+                "La satisfacción general y la metodología solo se preguntaron "
+                "en la sesión de bienvenida; no hay serie temporal que comparar."
+            )
+        else:
+            for columna, etiqueta, color in (
+                ("Satisfaccion", "Satisfacción con la participación", PALETA[1]),
+                ("Metodologia", "Metodología y acompañamiento", PALETA[4]),
+            ):
+                valido = escalas.dropna(subset=[columna])
+                if valido.empty:
+                    continue
+                figura = px.bar(
+                    valido,
+                    x="Etiqueta",
+                    y=columna,
+                    text=columna,
+                    color_discrete_sequence=[color],
+                )
+                plantilla(figura, 360, oscuro=oscuro)
+                figura.update_layout(title=f"{etiqueta} (promedio 1-5)", yaxis_range=[0, 5.4])
+                figura.update_traces(texttemplate="%{text:.2f}", textposition="outside")
+                graficar(figura)

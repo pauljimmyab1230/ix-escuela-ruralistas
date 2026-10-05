@@ -110,6 +110,7 @@ class Contexto:
     filtros: Filtros
     becarios: pd.DataFrame
     asistencia: pd.DataFrame
+    asistencia_becarios: pd.DataFrame
     encuestas: pd.DataFrame
     examen: pd.DataFrame
     entregables: pd.DataFrame
@@ -131,7 +132,19 @@ class Contexto:
 def construir_contexto(libro: LibroSistematizacion, filtros: Filtros) -> Contexto:
     """Filtra todas las tablas relevantes según la selección del sidebar."""
     becarios = filtrar_becarios(libro, filtros)
+
+    # La hoja de asistencia incluye mentores, representantes e invitados. Se
+    # conserva completa como registro operativo y se añade la versión recortada
+    # a becarios para los indicadores de participación y retención.
     asistencia = filtrar_por_correos(libro.asistencia, "Correo electrónico", filtros, becarios)
+    asistencia_becarios = filtrar_por_emails(
+        libro.asistencia, "Correo electrónico", correos_filtrados(libro.becarios)
+    )
+    if filtros.activos:
+        asistencia_becarios = filtrar_por_emails(
+            asistencia_becarios, "Correo electrónico", correos_filtrados(becarios)
+        )
+
     encuestas = filtrar_por_correos(encuestas_por_sesion(libro), "Correo", filtros, becarios)
     examen = filtrar_por_correos(libro.examen, "Correo", filtros, becarios)
     entregables = filtrar_por_correos(libro.entregables, "Correo", filtros, becarios)
@@ -143,6 +156,7 @@ def construir_contexto(libro: LibroSistematizacion, filtros: Filtros) -> Context
         filtros=filtros,
         becarios=becarios,
         asistencia=asistencia,
+        asistencia_becarios=asistencia_becarios,
         encuestas=encuestas,
         examen=examen,
         entregables=entregables,

@@ -11,16 +11,17 @@ RUTA_APP = Path(__file__).resolve().parent.parent / "app.py"
 
 PAGINAS = [
     ("🏠 Resumen General", 8),
-    ("👥 Becarios", 15),
-    ("📋 Encuestas", 5),
+    ("📊 Participación", 4),
+    ("👥 Becarios", 21),
+    ("📋 Encuestas", 8),
     ("📅 Asistencia", 3),
-    ("📝 Evaluaciones", 7),
-    ("📈 Línea Base vs Final", 10),
+    ("📝 Evaluaciones", 13),
+    ("📈 Línea Base vs Final", 13),
 ]
 
 
 def _ejecutar(etiqueta: str) -> AppTest:
-    at = AppTest.from_file(str(RUTA_APP), default_timeout=180)
+    at = AppTest.from_file(str(RUTA_APP), default_timeout=240)
     at.run()
     at.radio[0].set_value(etiqueta)
     at.run()
@@ -35,15 +36,15 @@ def test_pagina_se_renderiza_sin_excepciones(etiqueta, graficos_esperados):
     assert len(at.get("plotly_chart")) == graficos_esperados
 
 
-def test_el_sidebar_ofrece_las_seis_paginas():
-    at = AppTest.from_file(str(RUTA_APP), default_timeout=180)
+def test_el_sidebar_ofrece_las_siete_paginas():
+    at = AppTest.from_file(str(RUTA_APP), default_timeout=240)
     at.run()
     opciones = list(at.radio[0].options)
     assert [etiqueta for etiqueta, _ in PAGINAS] == opciones
 
 
 def test_los_filtros_de_region_y_genero_no_revientan():
-    at = AppTest.from_file(str(RUTA_APP), default_timeout=180)
+    at = AppTest.from_file(str(RUTA_APP), default_timeout=240)
     at.run()
     regiones = list(at.selectbox[0].options)
     assert "Todas" in regiones
@@ -53,7 +54,7 @@ def test_los_filtros_de_region_y_genero_no_revientan():
 
 
 def test_el_modo_claro_tambien_renderiza():
-    at = AppTest.from_file(str(RUTA_APP), default_timeout=180)
+    at = AppTest.from_file(str(RUTA_APP), default_timeout=240)
     at.run()
     at.toggle[0].set_value(False)
     at.run()
@@ -61,10 +62,16 @@ def test_el_modo_claro_tambien_renderiza():
 
 
 def test_filtro_individual_por_becario():
-    at = AppTest.from_file(str(RUTA_APP), default_timeout=180)
+    at = AppTest.from_file(str(RUTA_APP), default_timeout=240)
     at.run()
     etiquetas = list(at.multiselect[0].options)
     assert etiquetas, "El selector individual debe tener becarios"
     at.multiselect[0].set_value([etiquetas[0]])
     at.run()
     assert list(at.exception) == []
+
+
+def test_participacion_muestra_los_tres_indicadores():
+    at = _ejecutar("📊 Participación")
+    metricas = {m.label for m in at.metric}
+    assert {"Inscritos", "Activos", "Certificados"}.issubset(metricas)

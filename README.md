@@ -47,11 +47,12 @@ entrada heredado y hace lo mismo.
 | Página | Contenido |
 |---|---|
 | 🏠 Resumen General | Indicadores globales, demografía, asistencia, calificaciones y calidad de los datos |
-| 👥 Becarios | Demografía, conocimientos autopercibidos, experiencia emprendedora y preguntas abiertas |
-| 📋 Encuestas | Satisfacción por sesión y categorías de las respuestas abiertas |
-| 📅 Asistencia | Participación por sesión y por participante |
-| 📝 Evaluaciones | Examen inicial, entregables y planes de emprendimiento |
-| 📈 Línea Base vs Final | Evolución de conocimientos, mapas de calor individuales y expectativas vs resultados |
+| 📊 Participación | Inscritos / activos / certificados, asistencia por sesión (n y %) y tasa de retención |
+| 👥 Becarios | Demografía por rangos, país, región, especialidad, conocimientos, experiencia emprendedora y redes |
+| 📋 Encuestas | Satisfacción por sesión, escalas de utilidad/claridad/aprendizaje y categorías abiertas |
+| 📅 Asistencia | Participación por sesión y por participante (registro completo de accesos) |
+| 📝 Evaluaciones | Examen, entregables, planes de emprendimiento y evaluación de mentores y representantes |
+| 📈 Línea Base vs Final | Evolución de conocimientos, cambios en habilidades y expectativas vs resultados |
 
 La barra lateral permite filtrar por **región**, **género** y por **becarios
 concretos**, además de cambiar entre tema oscuro y claro.
@@ -83,6 +84,7 @@ concretos**, además de cambiar entre tema oscuro y claro.
 │   ├── normalizacion.py      # Fechas, acentos, escalas y limpieza de textos
 │   ├── categorias.py         # Motor de categorización de respuestas abiertas
 │   ├── datos.py              # Modelo del libro de sistematización
+│   ├── indicadores.py        # Participación, retención, examen, escalas, ranking
 │   └── reportes.py           # Tablas resumen y escritura de resultados
 │
 ├── reglas_categorias.yaml    # Reglas de categorización, editables sin tocar código
@@ -208,6 +210,49 @@ libro de datos.
 
 ---
 
+## Cuadros del informe
+
+El dashboard cubre los cuadros mínimos de la sistematización, agrupados por
+tema. Todos se recalculan según los filtros activos del sidebar.
+
+| Bloque | Cuadros |
+|---|---|
+| Participación | Inscritos / activos / certificados · asistencia por sesión (n y %) · tasa de retención |
+| Perfil | Género · edad por rangos · país · región (Perú) · lengua materna · nivel educativo · especialidad · vínculo rural · redes juveniles |
+| Conocimientos (línea base) | Nivel autopercibido por tema · participación previa en emprendimientos · redes juveniles |
+| Línea final | Comparación de conocimientos · cambio en hablar en público, liderazgo y reconocimiento de actores |
+| Examen | Promedio, mediana y desviación · acierto por pregunta |
+| Satisfacción | Calificación y satisfacción por sesión · utilidad, claridad y aprendizaje por sesión |
+| Mentores y representantes | Evaluación por dimensión y por persona, con comentarios |
+| Planes | Puntaje por grupo y jurado · ranking final |
+| Entregables | Cobertura y promedio por entregable |
+
+### Criterios de cálculo
+
+Los indicadores de participación usan estas definiciones:
+
+- **Inscritos** — becarios del registro (`01a.Becarios`).
+- **Activos** — becarios con al menos una sesión de asistencia.
+- **Certificados** — aprobaron el examen (≥ `18/20`), entregaron al menos un
+  entregable con nota y superaron el `75%` de asistencia sobre las sesiones
+  del programa.
+- **% de asistencia** — asistentes a la sesión ÷ inscritos.
+- **Tasa de retención** — asistentes a la sesión ÷ asistentes a la sesión 1.
+
+La hoja `05.Asistencia` incluye mentores, representantes e invitados. Todos
+los indicadores de participación se recortan a los correos de los becarios
+inscritos; la página de Asistencia conserva el registro completo.
+
+El **cuadro de línea base vs línea final** muestra las dos muestras por
+separado y marca cuántos becarios tienen ambas mediciones, porque la línea
+base y la línea final no cubren a las mismas personas.
+
+La **clave de respuestas del examen** se deduce de la opción más elegida por
+pregunta. La suma de respuestas no modales coincide con los errores totales
+implícitos en el puntaje, lo que confirma la deducción.
+
+---
+
 ## Notas de calidad de los datos
 
 El dashboard muestra un bloque de **calidad de los datos** en el resumen general.
@@ -222,6 +267,13 @@ Conviene tenerlo presente al interpretar los resultados:
   «qué esperaba aprender» vs «qué aprendió» enfrenta el total de becarios con
   quienes respondieron el formulario de cierre. Las diferencias absolutas
   reflejan esa brecha además del contenido.
+- **Fechas de sesión con deriva.** El calendario (`04.Sesiones`) registra la
+  sesión 3 el 2026-06-06 y la asistencia la anota el 2026-06-05. El emparejamiento
+  fecha-sesión tolera dos días de diferencia para no perder la correspondencia.
+- **Nombres de región y especialidad con variantes.** `Junín`/`Junin`,
+  `Cusco`/`Cuzco` o `Ingeniería Ambiental`/`Ing Ambiental` son la misma cosa
+  escrita de formas distintas. `src/normalizacion.py` unifica esas variantes
+  antes de agrupar; si aparecen etiquetas nuevas, se añaden al mapa de alias.
 
 ---
 
