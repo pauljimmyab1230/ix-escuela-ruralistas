@@ -1,0 +1,43 @@
+[project]
+name = "ix-escuela-ruralistas"
+version = "1.0.0"
+description = "Sistematización de la IX Escuela de Jóvenes Ruralistas 2026"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Ypard / EJR" }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "core", "paginas", "tests"]
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # errores de pycodestyle
+    "W",   # advertencias de pycodestyle
+    "F",   # pyflakes
+    "I",   # orden de imports
+    "B",   # bugbear
+    "UP",  # modernización de sintaxis
+    "C4",  # comprensiones
+    "SIM", # simplificaciones
+    "RUF", # reglas propias de ruff
+]
+ignore = [
+    "E501",   # la longitud de línea la gestiona el formateador
+    "SIM108", # el ternario no siempre es más claro
+    "C408",   # dict(...) es idiomático en las llamadas de Plotly
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "core", "paginas"]

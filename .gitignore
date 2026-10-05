@@ -1,3 +1,9 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -5,7 +11,23 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Herramientas de calidad
+.ruff_cache/
+
+# Variables de entorno
 .env
+.env.*
+
+# Datos e informes generados por el pipeline
+datos/
+informes/
+Graficas/
+
+# Libros de datos intermedios (solo se versiona el de sistematización)
 *.xlsx
 !Sistematizacion_nueva.xlsx
-Graficas/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
