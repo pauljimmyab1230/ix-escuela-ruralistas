@@ -24,7 +24,7 @@ from core.datos import (
     etiquetas_de_becarios,
     opciones_de_filtros,
 )
-from core.graficos import aplicar_tema_css
+from core.graficos import aplicar_tema_css, establecer_modo_documento
 from paginas import (
     asistencia,
     becarios,
@@ -94,7 +94,23 @@ def main() -> None:
 
         st.markdown("---")
         oscuro = st.toggle("Modo oscuro", value=True)
+        documento = st.toggle(
+            "Modo documento",
+            value=False,
+            help=(
+                "Fondo blanco y texto oscuro en los gráficos. Actívalo antes de "
+                "descargar o capturar las imágenes que vayas a pegar en Word o en "
+                "un PDF; con el tema oscuro el texto se ve mal sobre papel blanco."
+            ),
+        )
+        establecer_modo_documento(documento)
         aplicar_tema_css(oscuro)
+
+        if documento:
+            st.info(
+                "Modo documento activo. Descarga las imágenes con la cámara del "
+                "gráfico y pégalas en tu informe."
+            )
 
         st.markdown("---")
         filtros = _construir_filtros(libro)

@@ -57,6 +57,23 @@ entrada heredado y hace lo mismo.
 La barra lateral permite filtrar por **región**, **género** y por **becarios
 concretos**, además de cambiar entre tema oscuro y claro.
 
+### Exportar los gráficos a Word o PDF
+
+Si vas a pegar las imágenes en un informe, activa **«Modo documento»** en la
+barra lateral antes de descargarlas. Pasa los gráficos a fondo blanco y texto
+oscuro, que es lo que se ve bien sobre papel blanco.
+
+Dos detalles que resuelve este modo:
+
+- **El fondo es opaco.** Si fuera transparente, Word y el PDF componen el PNG
+  sobre blanco y el texto claro del tema oscuro queda ilegible.
+- **El título conserva su estilo.** `fig.update_layout(title="texto")` reemplaza
+  el objeto título completo de Plotly y borra la fuente; el estilo se re-aplica
+  al publicar cada gráfico.
+
+La descarga se hace con el icono de cámara que aparece al pasar el cursor
+sobre cada gráfico.
+
 ---
 
 ## Estructura del proyecto

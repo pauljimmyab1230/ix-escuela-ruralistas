@@ -1,7 +1,15 @@
 """Plantilla de gráficos y estilos del dashboard.
 
-Centraliza el tema claro/oscuro para que el selector del sidebar afecte por
-igual al CSS y a los gráficos de Plotly.
+Centraliza el tema claro/oscuro y el modo documento para que el selector del
+sidebar afecte por igual al CSS y a los gráficos de Plotly.
+
+Dos detalles importantes para exportar imágenes:
+
+- El fondo de la figura es **opaco**. Si fuera transparente, Word y el PDF
+  componen el PNG sobre blanco y el texto claro queda ilegible.
+- El estilo del título se re-aplica al publicar el gráfico, porque
+  ``fig.update_layout(title="texto")`` reemplaza el objeto título completo y
+  borra la fuente definida en :func:`plantilla`.
 """
 
 from __future__ import annotations
@@ -15,6 +23,7 @@ TEMA_OSCURO = {
     "plantilla": "plotly_dark",
     "texto": "#e0e0e0",
     "rejilla": "rgba(255,255,255,0.08)",
+    "fondo_grafico": "#0e1117",
     "fondo_sidebar": "linear-gradient(180deg, #0a0d14 0%, #111827 50%, #1a1d24 100%)",
     "titulo_sidebar": COLOR_ACENTO,
     "texto_sidebar": "rgba(255,255,255,0.9)",
@@ -25,15 +34,51 @@ TEMA_CLARO = {
     "plantilla": "plotly_white",
     "texto": "#1a1a1a",
     "rejilla": "rgba(0,0,0,0.08)",
+    "fondo_grafico": "#ffffff",
     "fondo_sidebar": "linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%)",
     "titulo_sidebar": "#ffffff",
     "texto_sidebar": "rgba(255,255,255,0.92)",
     "borde_sidebar": "rgba(255,255,255,0.25)",
 }
 
+# Tema pensado para pegar la imagen en un documento de texto (Word, PDF).
+TEMA_DOCUMENTO = {
+    "plantilla": "plotly_white",
+    "texto": "#1a1a1a",
+    "rejilla": "rgba(0,0,0,0.10)",
+    "fondo_grafico": "#ffffff",
+    "fondo_sidebar": "linear-gradient(180deg, #1a237e 0%, #283593 50%, #3949ab 100%)",
+    "titulo_sidebar": "#ffffff",
+    "texto_sidebar": "rgba(255,255,255,0.92)",
+    "borde_sidebar": "rgba(255,255,255,0.25)",
+}
 
-def colores_de_tema(oscuro: bool) -> dict[str, str]:
+# Ajustes del título que `update_layout(title="texto")` tiende a borrar.
+_ESTILO_TITULO = {
+    "font": dict(size=16, color=COLOR_ACENTO),
+    "x": 0.5,
+    "xanchor": "center",
+}
+
+_MODO_DOCUMENTO = False
+
+
+def establecer_modo_documento(activo: bool) -> None:
+    """Activa el tema de exportación para documentos."""
+    global _MODO_DOCUMENTO
+    _MODO_DOCUMENTO = bool(activo)
+
+
+def modo_documento_activo() -> bool:
+    """Indica si el tema de exportación para documentos está activo."""
+    return _MODO_DOCUMENTO
+
+
+def colores_de_tema(oscuro: bool, documento: bool | None = None) -> dict[str, str]:
     """Devuelve la paleta de estilo para el tema indicado."""
+    usar_documento = _MODO_DOCUMENTO if documento is None else documento
+    if usar_documento:
+        return TEMA_DOCUMENTO
     return TEMA_OSCURO if oscuro else TEMA_CLARO
 
 
@@ -67,7 +112,7 @@ def aplicar_tema_css(oscuro: bool) -> None:
                 padding-bottom: 10px;
                 color: {tema["texto"]};
             }}
-            h2, h3 {{ color: {tema["texto"]}; }}
+            h2, h3, h4, h5 {{ color: {tema["texto"]}; }}
             .stTabs [data-baseweb="tab"] {{
                 border-radius: 8px 8px 0 0; padding: 10px 20px; font-weight: 600;
             }}
@@ -103,13 +148,26 @@ def aplicar_tema_css(oscuro: bool) -> None:
     )
 
 
+def _asegurar_estilo_titulo(fig: Any) -> None:
+    """Re-aplica la fuente del título si fue sobrescrita.
+
+    ``fig.update_layout(title="texto")`` reemplaza el objeto ``title`` completo
+    y elimina la fuente, el tamaño y la posición. Aquí se restauran sin tocar
+    el texto que la página haya definido.
+    """
+    titulo = getattr(fig.layout, "title", None)
+    if titulo is None or not getattr(titulo, "text", None):
+        return
+    fig.update_layout(title=dict(text=titulo.text, **_ESTILO_TITULO))
+
+
 def plantilla(fig: Any, altura: int = ALTO_GRAFICO, oscuro: bool = True) -> Any:
     """Aplica la identidad visual común a una figura de Plotly."""
     tema = colores_de_tema(oscuro)
     fig.update_layout(
         template=tema["plantilla"],
         font=dict(family="Segoe UI, sans-serif", size=12, color=tema["texto"]),
-        title=dict(font=dict(size=16, color=COLOR_ACENTO), x=0.5, xanchor="center"),
+        title=dict(text=None, **_ESTILO_TITULO),
         margin=dict(t=50, b=40, l=40, r=20),
         height=altura,
         legend=dict(
@@ -120,8 +178,10 @@ def plantilla(fig: Any, altura: int = ALTO_GRAFICO, oscuro: bool = True) -> Any:
             x=0.5,
             font_size=11,
         ),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
+        # Fondo opaco: con transparencia, Word y el PDF componen el PNG sobre
+        # blanco y el texto claro del tema oscuro queda ilegible.
+        plot_bgcolor=tema["fondo_grafico"],
+        paper_bgcolor=tema["fondo_grafico"],
     )
     fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor=tema["rejilla"])
     fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor=tema["rejilla"])
@@ -143,4 +203,5 @@ def graficar(fig: Any, *, usar_anchura_completa: bool = True) -> None:
     """Publica una figura en Streamlit sin los avisos de API deprecada."""
     import streamlit as st
 
+    _asegurar_estilo_titulo(fig)
     st.plotly_chart(fig, width="stretch" if usar_anchura_completa else "content")
